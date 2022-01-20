@@ -10,6 +10,8 @@ router.get("/", jsonParser, getWorkspaceCoffees);
 router.post("/", jsonParser, createCoffee);
 router.put("/", jsonParser, updateCoffee);
 
+router.get("/", jsonParser, getWorkspaceCoffeesNames);
+
 module.exports = router;
 
 function createCoffee(req, reshttp) {
@@ -107,6 +109,41 @@ const isUserInWorkspace = (user_id, workspace_id, connection, callback) => {
 		}
 	);
 };
+
+function getWorkspaceCoffeesNames(req, reshttp) {
+	const user_id = req.query.user_id;
+	const workspace_id = req.query.user_id;
+	pool.getConnection((err, connection) => {
+		if (err) throw err;
+		isUserInWorkspace(user_id, workspace_id, connection, (res) => {
+			if (res) {
+				connection.query(`select name from coffees where workspace_id = ${workspace_id}`, (err, res) => {
+					if (err) throw err;
+					reshttp.setHeader("Content-Type", "application/json");
+					reshttp.status(200);
+					reshttp.end(
+						JSON.stringify({
+							message: "coffeesnames",
+							coffees: res,
+							variant: "success",
+						})
+					);
+					return;
+				})
+			} else {
+				reshttp.setHeader("Content-Type", "application/json");
+				reshttp.status(200);
+				reshttp.end(
+					JSON.stringify({
+						message: "user not in workspace",
+						variant: "error",
+					})
+				);
+				return;
+			}
+		})
+	})
+}
 
 function getWorkspaceCoffees(req, reshttp) {
 	const user_id = req.query.user_id;
