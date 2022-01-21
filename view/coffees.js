@@ -10,7 +10,7 @@ router.get("/", jsonParser, getWorkspaceCoffees);
 router.post("/", jsonParser, createCoffee);
 router.put("/", jsonParser, updateCoffee);
 
-router.get("/", jsonParser, getWorkspaceCoffeesNames);
+router.get("/names", jsonParser, getWorkspaceCoffeesNames);
 
 module.exports = router;
 
@@ -26,13 +26,20 @@ function createCoffee(req, reshttp) {
 	// 	);
 	// 	return;
 	// }
-	console.log(req.query);
-	const name = req.query.name;
-	const description = req.query.description;
-	const image = req.query.image;
-	const url = req.query.url;
-	const user_id = req.query.user_id;
-	const workspace_id = req.query.workspace_id;
+	// const name = req.query.name;
+	// const description = req.query.description;
+	// const image = req.query.image;
+	// const url = req.query.url;
+	// const user_id = req.query.user_id;
+	// const workspace_id = req.query.workspace_id;
+
+	const name = req.body.name;
+	const description = req.body.description;
+	const image = req.body.image;
+	const url = req.body.url;
+	const user_id = req.body.user_id;
+	const workspace_id = req.body.workspace_id;
+
 
 	pool.getConnection((err, connection) => {
 		if (err) throw err;
@@ -112,11 +119,12 @@ const isUserInWorkspace = (user_id, workspace_id, connection, callback) => {
 
 function getWorkspaceCoffeesNames(req, reshttp) {
 	const user_id = req.query.user_id;
-	const workspace_id = req.query.user_id;
+	const workspace_id = req.query.workspace_id;
 	pool.getConnection((err, connection) => {
 		if (err) throw err;
 		isUserInWorkspace(user_id, workspace_id, connection, (res) => {
 			if (res) {
+				console.log(workspace_id);
 				connection.query(`select name from coffees where workspace_id = ${workspace_id}`, (err, res) => {
 					if (err) throw err;
 					reshttp.setHeader("Content-Type", "application/json");
@@ -124,7 +132,7 @@ function getWorkspaceCoffeesNames(req, reshttp) {
 					reshttp.end(
 						JSON.stringify({
 							message: "coffeesnames",
-							coffees: res,
+							coffees: res.map(coffee => coffee.name),
 							variant: "success",
 						})
 					);
