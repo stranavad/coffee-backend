@@ -233,7 +233,6 @@ function addUserWorkspace(req, reshttp) {
 								}
 							);
 						}
-
 					}
 				);
 			}
