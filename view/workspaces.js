@@ -10,8 +10,77 @@ router.post("/", jsonParser, addWorkspace);
 // router.delete("/", jsonParser, deleteWorkspace);
 router.put("/", jsonParser, updateWorkspace);
 router.get("/protected", jsonParser, getWorkspaceProtected);
+router.post("/protected", jsonParser, verifyProtectKey);
 
 module.exports = router;
+
+function verifyProtectKey(req, reshttp) {
+	const user_id = req.body.user_id;
+	const workspace_id = req.body.workspace_id;
+	const edit_key = req.body.edit_key;
+
+	console.log(edit_key);
+
+	pool.getConnection((err, connection) => {
+		isUserInWorkspace(user_id, workspace_id, connection, (res) => {
+			if (res) {
+				connection.query(`select protect, edit_key from workspaces where id = ${workspace_id}`, (err, res) => {
+					if (err) throw err;
+					if (res) {
+						console.log(res);
+						if (res[0].protect && res[0].edit_key === edit_key) {
+							reshttp.end(
+								JSON.stringify({
+									message:
+										"verified",
+									verified: true,
+									variant: "success",
+								})
+							);
+							return;
+						} else if (!res[0].protect) {
+							reshttp.end(
+								JSON.stringify({
+									message:
+										"this workspace isn't protected",
+									verified: true,
+									variant: "success",
+								})
+							);
+							return;
+						} else if (res[0].protect && res[0].edit_key !== edit_key) {
+							reshttp.end(
+								JSON.stringify({
+									message:
+										"not verified",
+									verified: false,
+									variant: "success",
+								})
+							);
+							return;
+						}
+					} else {
+						reshttp.end(
+							JSON.stringify({
+								message: "no workspace with this id",
+								variant: "warning",
+							})
+						);
+						return;
+					}
+				})
+			} else {
+				reshttp.end(
+					JSON.stringify({
+						message: "user isn't in this workspace",
+						variant: "error",
+					})
+				);
+				return;
+			}
+		}) 
+	}) 
+}
 
 function getWorkspaceProtected(req, reshttp) {
 	const user_id = req.query.user_id;
