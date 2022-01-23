@@ -8,6 +8,7 @@ const pool = require("../index");
 // Coffees
 router.get("/", jsonParser, getWorkspaceCoffees);
 router.post("/", jsonParser, createCoffee);
+router.get("/id", jsonParser, getCoffeeById);
 // router.put("/", jsonParser, updateCoffee);
 
 router.get("/names", jsonParser, getWorkspaceCoffeesNames);
@@ -121,6 +122,91 @@ function getWorkspaceCoffeesNames(req, reshttp) {
 							message: "coffeesnames",
 							coffees: res.map(coffee => coffee.name),
 							variant: "success",
+						})
+					);
+					return;
+				})
+			} else {
+				connection.release();
+				reshttp.setHeader("Content-Type", "application/json");
+				reshttp.status(200);
+				reshttp.end(
+					JSON.stringify({
+						message: "user not in workspace",
+						variant: "error",
+					})
+				);
+				return;
+			}
+		})
+	})
+}
+
+function getCoffeeById(req, reshttp) {
+	const userId = req.query.userId;
+	const workspaceId = req.query.workspaceId;
+	const coffeeId = req.query.coffeeId;
+
+	pool.getConnection((err, connection) => {
+		isUserInWorkspace(userId, workspaceId, connection, (res) => {
+			if (res) {
+				connection.query(`
+				select
+				coffees.name as name,
+				coffees.id as id,
+				coffees.description as description,
+				coffees.image as image,
+				coffees.url as url,
+				coffees.current as current,
+				ratings.user_id as user_id,
+				ratings.rating as rating,
+				ratings.notes as notes,
+				users.name as user_name
+				from coffees
+				left join ratings on coffees.id = ratings.coffee_id
+				left join users on ratings.user_id = users.id
+				where coffees.id = ${coffeeId}
+				`, (err, res) => {
+					if (err) throw err;
+					connection.release();
+					if (res.length > 0) {
+						let coffee = {
+							name: res[0].name,
+							id: res[0].id,
+							description: res[0].description,
+							image: res[0].image,
+							url: res[0].url,
+							ratings: [],
+							count: 0,
+							sum: 0,
+							average: 0
+						}
+						res.forEach((item) => {
+							if (item.user_id) {
+								coffee.ratings = [
+									...coffee.ratings,
+									{
+										name: item.user_name,
+										userId: item.user_id,
+										rating: item.rating,
+										notes: item.notes,
+									},
+								];
+								coffee.count++;
+								coffee.sum += item.rating;
+								coffee.average =
+									coffee.sum /
+									coffee.count;
+							}
+						})
+					}
+					reshttp.setHeader("Content-Type", "application/json");
+					reshttp.status(200);
+					reshttp.end(
+						JSON.stringify({
+							message: "coffee",
+							variant: "success",
+							coffee
 						})
 					);
 					return;
