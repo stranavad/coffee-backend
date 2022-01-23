@@ -64,6 +64,7 @@ function addUser(req, reshttp) {
 	const user_id = req.query.user_id;
 	const email = req.query.email;
 	const name = req.query.name;
+
 	pool.getConnection((err, connection) => {
 		if (err) throw err;
 		connection.query(
@@ -173,7 +174,7 @@ function addUserWorkspace(req, reshttp) {
 				if (err) throw err;
 				console.log(res);
 				if (res.length > 0) {
-					console.log("returning");
+					connection.release();
 					reshttp.setHeader("Content-Type", "application/json");
 					reshttp.end(
 						JSON.stringify({
@@ -201,6 +202,7 @@ function addUserWorkspace(req, reshttp) {
 												`insert into users_workspaces (user_id, workspace_id) values (${user_id}, ${workspace_id}) `,
 												(err, res) => {
 													if (err) throw err;
+													connection.release();
 													reshttp.setHeader(
 														"Content-Type",
 														"application/json"
@@ -217,6 +219,7 @@ function addUserWorkspace(req, reshttp) {
 											);
 										}
 									} else {
+										connection.release();
 										reshttp.setHeader(
 											"Content-Type",
 											"application/json"
@@ -232,6 +235,10 @@ function addUserWorkspace(req, reshttp) {
 									}
 								}
 							);
+						} else {
+							connection.release();
+							return;
+
 						}
 					}
 				);

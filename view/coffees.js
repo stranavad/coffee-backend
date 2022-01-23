@@ -15,44 +15,28 @@ router.get("/names", jsonParser, getWorkspaceCoffeesNames);
 module.exports = router;
 
 function createCoffee(req, reshttp) {
-	// if (!req.body?.coffee || !req.body?.user_id || !req.body?.workspace_id) {
-	// 	reshttp.setHeader("Content-Type", "application/json");
-	// 	reshttp.status(200);
-	// 	reshttp.end(
-	// 		JSON.stringify({
-	// 			message: "not enough arguments",
-	// 			variant: "error",
-	// 		})
-	// 	);
-	// 	return;
-	// }
-	// const name = req.query.name;
-	// const description = req.query.description;
-	// const image = req.query.image;
-	// const url = req.query.url;
-	// const user_id = req.query.user_id;
-	// const workspace_id = req.query.workspace_id;
-
 	const name = req.body.name;
 	const description = req.body.description;
 	const image = req.body.image;
 	const url = req.body.url;
-	const user_id = req.body.user_id;
-	const workspace_id = req.body.workspace_id;
+	const userId = req.body.userId;
+	const workspaceId = req.body.workspaceId;
 
 
 	pool.getConnection((err, connection) => {
 		if (err) throw err;
-		isUserInWorkspace(user_id, workspace_id, connection, (res) => {
+		isUserInWorkspace(userId, workspaceId, connection, (res) => {
 			if (res) {
 				connection.query(
-					`select id from coffees where name = '${name}' and workspace_id = ${workspace_id}`,
+					`select id from coffees where name = '${name}' and workspace_id = ${workspaceId}`,
 					(err, res) => {
+						console.log(res);
 						if (err) throw err;
 						if (res.length === 0) {
 							connection.query(
-								`insert into coffees (workspace_id, name, description, image, url, current) values (${workspace_id}, '${name}', '${description}', '${image}', '${url}', 0)`,
+								`insert into coffees (workspace_id, name, description, image, url, current) values (${workspaceId}, '${name}', '${description}', '${image}', '${url}', 0)`,
 								(err) => {
+									connection.release();
 									if (err) throw err;
 									reshttp.setHeader(
 										"Content-Type",
@@ -69,6 +53,7 @@ function createCoffee(req, reshttp) {
 								}
 							);
 						} else {
+							connection.release();
 							// coffee with this name already exists in this workspace
 							reshttp.setHeader(
 								"Content-Type",
@@ -86,6 +71,7 @@ function createCoffee(req, reshttp) {
 					}
 				);
 			} else {
+				connection.release();
 				// user is not logged in
 				reshttp.setHeader("Content-Type", "application/json");
 				reshttp.status(200);
@@ -101,9 +87,9 @@ function createCoffee(req, reshttp) {
 	});
 }
 
-const isUserInWorkspace = (user_id, workspace_id, connection, callback) => {
+const isUserInWorkspace = (userId, workspaceId, connection, callback) => {
 	connection.query(
-		`select user_id from users_workspaces where user_id = ${user_id} and workspace_id = ${workspace_id}`,
+		`select user_id from users_workspaces where user_id = ${userId} and workspace_id = ${workspaceId}`,
 		(err, res) => {
 			if (err) throw err;
 			console.log(res);
@@ -126,6 +112,7 @@ function getWorkspaceCoffeesNames(req, reshttp) {
 		isUserInWorkspace(userId, workspaceId, connection, (res) => {
 			if (res) {
 				connection.query(`select name from coffees where workspace_id = ${workspaceId}`, (err, res) => {
+					connection.release();
 					if (err) throw err;
 					reshttp.setHeader("Content-Type", "application/json");
 					reshttp.status(200);
@@ -139,6 +126,7 @@ function getWorkspaceCoffeesNames(req, reshttp) {
 					return;
 				})
 			} else {
+				connection.release();
 				reshttp.setHeader("Content-Type", "application/json");
 				reshttp.status(200);
 				reshttp.end(
@@ -180,6 +168,7 @@ function getWorkspaceCoffees(req, reshttp) {
 						where coffees.workspace_id = ${workspaceId}
                         `,
 					(err, res) => {
+						connection.release();
 						if (err) throw err;
 						if (res.length > 0) {
 							let coffees = {};
@@ -245,6 +234,7 @@ function getWorkspaceCoffees(req, reshttp) {
 					}
 				);
 			} else {
+				connection.release();
 				reshttp.setHeader("Content-Type", "application/json");
 				reshttp.end(
 					JSON.stringify({
@@ -259,97 +249,98 @@ function getWorkspaceCoffees(req, reshttp) {
 	});
 }
 
-function updateCoffee(req, reshttp) {
-	const user_id = req.query.user_id;
-	const workspace_id = req.query.workspace_id;
-	const secret = req.query.secret;
-	const edit_key = req.query.edit_key;
-	const coffee_id = req.query.coffee_id;
-	const name = req.query.name;
-	const description = req.query.description;
-	const image = req.query.image;
-	const url = req.query.url;
-	pool.getConnection((err, connection) => {
-		if (err) throw err;
-		isUserInWorkspace(user_id, workspace_id, connection, (res) => {
-			if (res) {
-				console.log("user exists");
-				connection.query(
-					`select secret, edit_key, protect from workspaces where id = ${workspace_id}`,
-					(err, res) => {
-						if (err) throw err;
-						res = res[0];
-						if (
-							res.secret === secret &&
-							((res.protect && res.edit_key === edit_key) ||
-								!res.protect)
-						) {
-							connection.query(
-								`select name from coffees where name = '${name}' and id <> ${coffee_id} and workspace_id = ${workspace_id}`,
-								(err, res) => {
-									if (err) throw err;
-									if (!(res.length > 0)) {
-										connection.query(
-											`update coffees set name = '${name}', description = '${description}', image = '${image}', url = '${url}' where id = ${coffee_id}`,
-											(err) => {
-												if (err) throw err;
-												reshttp.setHeader(
-													"Content-Type",
-													"application/json"
-												);
-												reshttp.end(
-													JSON.stringify({
-														message:
-															"coffee updated",
-														variant: "success",
-													})
-												);
-												return;
-											}
-										);
-									} else {
-										reshttp.setHeader(
-											"Content-Type",
-											"application/json"
-										);
-										reshttp.end(
-											JSON.stringify({
-												message:
-													"coffee with this name already exists in your workspace",
-												variant: "warning",
-											})
-										);
-										return;
-									}
-								}
-							);
-						} else {
-							reshttp.setHeader(
-								"Content-Type",
-								"application/json"
-							);
-							reshttp.end(
-								JSON.stringify({
-									message: "wrong secrets",
-									variant: "error",
-								})
-							);
-							return;
-						}
-					}
-				);
-			} else {
-				// user isn't in workspace, or workspace, user doesn't exist
-				reshttp.setHeader("Content-Type", "application/json");
-				reshttp.end(
-					JSON.stringify({
-						message:
-							"user isn't in this workspace, or workspace doesn't exist",
-						variant: "error",
-					})
-				);
-				return;
-			}
-		});
-	});
-}
+// function updateCoffee(req, reshttp) {
+// 	const user_id = req.query.user_id;
+// 	const workspace_id = req.query.workspace_id;
+// 	const secret = req.query.secret;
+// 	const edit_key = req.query.edit_key;
+// 	const coffee_id = req.query.coffee_id;
+// 	const name = req.query.name;
+// 	const description = req.query.description;
+// 	const image = req.query.image;
+// 	const url = req.query.url;
+
+// 	pool.getConnection((err, connection) => {
+// 		if (err) throw err;
+// 		isUserInWorkspace(user_id, workspace_id, connection, (res) => {
+// 			if (res) {
+// 				console.log("user exists");
+// 				connection.query(
+// 					`select secret, edit_key, protect from workspaces where id = ${workspace_id}`,
+// 					(err, res) => {
+// 						if (err) throw err;
+// 						res = res[0];
+// 						if (
+// 							res.secret === secret &&
+// 							((res.protect && res.edit_key === edit_key) ||
+// 								!res.protect)
+// 						) {
+// 							connection.query(
+// 								`select name from coffees where name = '${name}' and id <> ${coffee_id} and workspace_id = ${workspace_id}`,
+// 								(err, res) => {
+// 									if (err) throw err;
+// 									if (!(res.length > 0)) {
+// 										connection.query(
+// 											`update coffees set name = '${name}', description = '${description}', image = '${image}', url = '${url}' where id = ${coffee_id}`,
+// 											(err) => {
+// 												if (err) throw err;
+// 												reshttp.setHeader(
+// 													"Content-Type",
+// 													"application/json"
+// 												);
+// 												reshttp.end(
+// 													JSON.stringify({
+// 														message:
+// 															"coffee updated",
+// 														variant: "success",
+// 													})
+// 												);
+// 												return;
+// 											}
+// 										);
+// 									} else {
+// 										reshttp.setHeader(
+// 											"Content-Type",
+// 											"application/json"
+// 										);
+// 										reshttp.end(
+// 											JSON.stringify({
+// 												message:
+// 													"coffee with this name already exists in your workspace",
+// 												variant: "warning",
+// 											})
+// 										);
+// 										return;
+// 									}
+// 								}
+// 							);
+// 						} else {
+// 							reshttp.setHeader(
+// 								"Content-Type",
+// 								"application/json"
+// 							);
+// 							reshttp.end(
+// 								JSON.stringify({
+// 									message: "wrong secrets",
+// 									variant: "error",
+// 								})
+// 							);
+// 							return;
+// 						}
+// 					}
+// 				);
+// 			} else {
+// 				// user isn't in workspace, or workspace, user doesn't exist
+// 				reshttp.setHeader("Content-Type", "application/json");
+// 				reshttp.end(
+// 					JSON.stringify({
+// 						message:
+// 							"user isn't in this workspace, or workspace doesn't exist",
+// 						variant: "error",
+// 					})
+// 				);
+// 				return;
+// 			}
+// 		});
+// 	});
+// }

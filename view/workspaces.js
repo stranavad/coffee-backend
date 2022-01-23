@@ -15,61 +15,67 @@ router.post("/protected", jsonParser, verifyProtectKey);
 module.exports = router;
 
 function verifyProtectKey(req, reshttp) {
-	const user_id = req.body.user_id;
-	const workspace_id = req.body.workspace_id;
-	const edit_key = req.body.edit_key;
-
-	console.log(edit_key);
+	const userId = req.body.userId;
+	const workspaceId = req.body.workspaceId;
+	const editKey = req.body.editKey;
 
 	pool.getConnection((err, connection) => {
-		isUserInWorkspace(user_id, workspace_id, connection, (res) => {
+		if (err) throw err;
+		isUserInWorkspace(userId, workspaceId, connection, (res) => {
 			if (res) {
-				connection.query(`select protect, edit_key from workspaces where id = ${workspace_id}`, (err, res) => {
-					if (err) throw err;
-					if (res) {
-						console.log(res);
-						if (res[0].protect && res[0].edit_key === edit_key) {
+				connection.query(
+					`select protect, edit_key from workspaces where id = ${workspaceId}`,
+					(err, res) => {
+						if (err) throw err;
+						if (res) {
+							connection.release();
+							console.log(res);
+							if (res[0].protect && res[0].edit_key === editKey) {
+								reshttp.end(
+									JSON.stringify({
+										message: "verified",
+										verified: true,
+										variant: "success",
+									})
+								);
+								return;
+							} else if (!res[0].protect) {
+								reshttp.end(
+									JSON.stringify({
+										message:
+											"this workspace isn't protected",
+										verified: true,
+										variant: "success",
+									})
+								);
+								return;
+							} else if (
+								res[0].protect &&
+								res[0].edit_key !== editKey
+							) {
+								reshttp.end(
+									JSON.stringify({
+										message: "not verified",
+										verified: false,
+										variant: "success",
+									})
+								);
+								return;
+							}
+						} else {
+							connection.release();
 							reshttp.end(
 								JSON.stringify({
-									message:
-										"verified",
-									verified: true,
-									variant: "success",
-								})
-							);
-							return;
-						} else if (!res[0].protect) {
-							reshttp.end(
-								JSON.stringify({
-									message:
-										"this workspace isn't protected",
-									verified: true,
-									variant: "success",
-								})
-							);
-							return;
-						} else if (res[0].protect && res[0].edit_key !== edit_key) {
-							reshttp.end(
-								JSON.stringify({
-									message:
-										"not verified",
-									verified: false,
-									variant: "success",
+									message: "no workspace with this id",
+									variant: "warning",
 								})
 							);
 							return;
 						}
-					} else {
-						reshttp.end(
-							JSON.stringify({
-								message: "no workspace with this id",
-								variant: "warning",
-							})
-						);
-						return;
 					}
-				})
+				);
 			} else {
+				connection.release();
 				reshttp.end(
 					JSON.stringify({
 						message: "user isn't in this workspace",
@@ -78,19 +84,19 @@ function verifyProtectKey(req, reshttp) {
 				);
 				return;
 			}
-		}) 
-	}) 
+		});
+	});
 }
 
 function getWorkspaceProtected(req, reshttp) {
-	const user_id = req.query.user_id;
-	const workspace_id = req.query.workspace_id;
+	const userId = req.query.userId;
+	const workspaceId = req.query.workspaceId;
 	pool.getConnection((err, connection) => {
 		if (err) throw err;
-		isUserInWorkspace(user_id, workspace_id, connection, (res) => {
+		isUserInWorkspace(userId, workspaceId, connection, (res) => {
 			if (res) {
 				connection.query(
-					`select protect from workspaces where id = ${workspace_id}`,
+					`select protect from workspaces where id = ${workspaceId}`,
 					(err, res) => {
 						if (err) throw err;
 						connection.release();
@@ -120,42 +126,28 @@ function getWorkspaceProtected(req, reshttp) {
 }
 
 function addWorkspace(req, reshttp) {
-	// if (
-	// 	!req.body?.user_id ||
-	// 	!req.body?.workspace_name ||
-	// 	!req.body?.workspace_secret
-	// ) {
-	// 	reshttp.setHeader("Content-Type", "application/json");
-	// 	reshttp.end(
-	// 		JSON.stringify({
-	// 			message: "Not enough arguments",
-	// 			variant: "warning",
-	// 		})
-	// 	);
-	// 	return;
-	// }
-	const user_id = parseInt(req.query.user_id);
+	const userId = userId;
 	const name = req.query.name;
 	const secret = req.query.secret;
 	const protect = req.query.protect;
-	const edit_key = req.query.edit_key;
-	console.log(req.query);
+	const editKey = req.query.editKey;
+
 	pool.getConnection((err, connection) => {
 		if (err) throw err;
 		connection.query(
-			`insert into workspaces (name, secret, protect, edit_key) values ('${name}', '${secret}', ${protect}, '${edit_key}')`,
+			`insert into workspaces (name, secret, protect, edit_key) values ('${name}', '${secret}', ${protect}, '${editKey}')`,
 			(err, res) => {
 				if (err) throw err;
 				connection.query(
 					`select max(id) from workspaces where name = '${name}' and secret = '${secret}'`,
 					(err, res) => {
 						if (err) throw err;
-						console.log(res);
 						const workspace_id = res[0]["max(id)"];
 						connection.query(
-							`insert into users_workspaces (user_id, workspace_id) values (${user_id}, '${workspace_id}')`,
+							`insert into users_workspaces (user_id, workspace_id) values (${userId}, '${workspaceid}')`,
 							(err, res) => {
 								if (err) throw err;
+								connection.release();
 								reshttp.setHeader(
 									"Content-Type",
 									"application/json"
@@ -178,74 +170,75 @@ function addWorkspace(req, reshttp) {
 	});
 }
 
-function updateWorkspace(req, reshttp) {
-	const name = req.query.name;
-	const user_id = req.query.user_id;
-	const workspace_id = req.query.workspace_id;
-	const secret = req.query.secret;
-	const edit_key = req.query.edit_key;
-	pool.getConnection((err, connection) => {
-		if (err) throw err;
-		isUserInWorkspace(user_id, workspace_id, connection, (res) => {
-			if (res) {
-				connection.query(
-					`select secret, edit_key from workspaces where id = ${workspace_id}`,
-					(err, res) => {
-						if (err) throw err;
-						if (
-							res[0].edit_key === edit_key &&
-							res[0].secret === secret
-						) {
-							connection.query(
-								`update workspaces set name = '${name}' where id = ${workspace_id}`,
-								(err) => {
-									if (err) throw err;
-									connection.release();
-									reshttp.setHeader(
-										"Content-Type",
-										"application/json"
-									);
-									reshttp.end(
-										JSON.stringify({
-											message: "workspace name updated",
-											variant: "success",
-										})
-									);
-									return;
-								}
-							);
-						} else {
-							connection.release();
-							reshttp.setHeader(
-								"Content-Type",
-								"application/json"
-							);
-							reshttp.end(
-								JSON.stringify({
-									message:
-										"secret key or edit key is incorrect",
-									variant: "error",
-								})
-							);
-							return;
-						}
-					}
-				);
-			} else {
-				connection.release();
-				reshttp.setHeader("Content-Type", "application/json");
-				reshttp.end(
-					JSON.stringify({
-						message:
-							"user id isn't in this workspace, or workspace doesn't exist",
-						variant: "error",
-					})
-				);
-				return;
-			}
-		});
-	});
-}
+// function updateWorkspace(req, reshttp) {
+// 	const name = req.query.name;
+// 	const userId = req.query.userId;
+// 	const workspaceId = req.query.workspaceId;
+// 	const secret = req.query.secret;
+// 	const editKey = req.query.editKey;
+
+// 	pool.getConnection((err, connection) => {
+// 		if (err) throw err;
+// 		isUserInWorkspace(userId, workspaceId, connection, (res) => {
+// 			if (res) {
+// 				connection.query(
+// 					`select secret, edit_key from workspaces where id = ${workspaceId}`,
+// 					(err, res) => {
+// 						if (err) throw err;
+// 						if (
+// 							res[0].edit_key === editKey &&
+// 							res[0].secret === secret
+// 						) {
+// 							connection.query(
+// 								`update workspaces set name = '${name}' where id = ${workspaceId}`,
+// 								(err) => {
+// 									if (err) throw err;
+// 									connection.release();
+// 									reshttp.setHeader(
+// 										"Content-Type",
+// 										"application/json"
+// 									);
+// 									reshttp.end(
+// 										JSON.stringify({
+// 											message: "workspace name updated",
+// 											variant: "success",
+// 										})
+// 									);
+// 									return;
+// 								}
+// 							);
+// 						} else {
+// 							connection.release();
+// 							reshttp.setHeader(
+// 								"Content-Type",
+// 								"application/json"
+// 							);
+// 							reshttp.end(
+// 								JSON.stringify({
+// 									message:
+// 										"secret key or edit key is incorrect",
+// 									variant: "error",
+// 								})
+// 							);
+// 							return;
+// 						}
+// 					}
+// 				);
+// 			} else {
+// 				connection.release();
+// 				reshttp.setHeader("Content-Type", "application/json");
+// 				reshttp.end(
+// 					JSON.stringify({
+// 						message:
+// 							"user id isn't in this workspace, or workspace doesn't exist",
+// 						variant: "error",
+// 					})
+// 				);
+// 				return;
+// 			}
+// 		});
+// 	});
+// }
 
 const isUserInWorkspace = (user_id, workspace_id, connection, callback) => {
 	connection.query(
