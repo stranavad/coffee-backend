@@ -154,11 +154,12 @@ function getWorkspaceCoffeesNames(req, reshttp) {
 }
 
 function getWorkspaceCoffees(req, reshttp) {
-	const user_id = req.query.user_id;
-	const workspace_id = req.query.workspace_id;
+	const userId = req.query.userId;
+	const workspaceId = req.query.workspaceId;
+
 	pool.getConnection((err, connection) => {
 		if (err) throw err;
-		isUserInWorkspace(user_id, workspace_id, connection, (res) => {
+		isUserInWorkspace(userId, workspaceId, connection, (res) => {
 			if (res) {
 				connection.query(
 					`
@@ -176,7 +177,7 @@ function getWorkspaceCoffees(req, reshttp) {
                         from coffees
                 		left join ratings on coffees.id = ratings.coffee_id
                         left join users on ratings.user_id = users.id
-						where coffees.workspace_id = ${workspace_id}
+						where coffees.workspace_id = ${workspaceId}
                         `,
 					(err, res) => {
 						if (err) throw err;
@@ -202,7 +203,7 @@ function getWorkspaceCoffees(req, reshttp) {
 										...coffees[item.id].ratings,
 										{
 											name: item.user_name,
-											user_id: item.user_id,
+											userId: item.user_id,
 											rating: item.rating,
 											notes: item.notes,
 										},
