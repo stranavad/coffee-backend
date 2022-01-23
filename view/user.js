@@ -104,9 +104,8 @@ function addUser(req, reshttp) {
 }
 
 function getUserWorkspace(req, reshttp) {
-	console.log(req.query);
-	const user_id = req.query.user_id;
-	if (!user_id) {
+	const userId = req.query.userId;
+	if (!userId) {
 		reshttp.setHeader("Content-Type", "application/json");
 		reshttp.end(
 			JSON.stringify({
@@ -125,11 +124,10 @@ function getUserWorkspace(req, reshttp) {
 			workspaces.name as name
 			from users_workspaces
 			left join workspaces on users_workspaces.workspace_id = workspaces.id
-			where users_workspaces.user_id = ${user_id}
+			where users_workspaces.user_id = ${userId}
 			`,
 			(err, res) => {
 				if (err) throw err;
-				console.log(res);
 				connection.release();
 				// user already exists
 				reshttp.setHeader("Content-Type", "application/json");
@@ -235,7 +233,6 @@ function addUserWorkspace(req, reshttp) {
 								}
 							);
 						}
-
 					}
 				);
 			}
