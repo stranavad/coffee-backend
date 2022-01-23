@@ -118,14 +118,14 @@ const isUserInWorkspace = (user_id, workspace_id, connection, callback) => {
 };
 
 function getWorkspaceCoffeesNames(req, reshttp) {
-	const user_id = req.query.user_id;
-	const workspace_id = req.query.workspace_id;
+	const userId = req.query.userId;
+	const workspaceId = req.query.workspaceId;
+
 	pool.getConnection((err, connection) => {
 		if (err) throw err;
-		isUserInWorkspace(user_id, workspace_id, connection, (res) => {
+		isUserInWorkspace(userId, workspaceId, connection, (res) => {
 			if (res) {
-				console.log(workspace_id);
-				connection.query(`select name from coffees where workspace_id = ${workspace_id}`, (err, res) => {
+				connection.query(`select name from coffees where workspace_id = ${workspaceId}`, (err, res) => {
 					if (err) throw err;
 					reshttp.setHeader("Content-Type", "application/json");
 					reshttp.status(200);
