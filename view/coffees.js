@@ -8,7 +8,7 @@ const pool = require("../index");
 // Coffees
 router.get("/", jsonParser, getWorkspaceCoffees);
 router.post("/", jsonParser, createCoffee);
-router.put("/", jsonParser, updateCoffee);
+// router.put("/", jsonParser, updateCoffee);
 
 router.get("/names", jsonParser, getWorkspaceCoffeesNames);
 

@@ -8,7 +8,7 @@ const pool = require("../index");
 // workspaces
 router.post("/", jsonParser, addWorkspace);
 // router.delete("/", jsonParser, deleteWorkspace);
-router.put("/", jsonParser, updateWorkspace);
+// router.put("/", jsonParser, updateWorkspace);
 router.get("/protected", jsonParser, getWorkspaceProtected);
 router.post("/protected", jsonParser, verifyProtectKey);
 
