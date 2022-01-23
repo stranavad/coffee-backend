@@ -9,8 +9,46 @@ const pool = require("../index");
 router.post("/", jsonParser, addWorkspace);
 // router.delete("/", jsonParser, deleteWorkspace);
 router.put("/", jsonParser, updateWorkspace);
+router.get("/protected", jsonParser, getWorkspaceProtected);
 
 module.exports = router;
+
+function getWorkspaceProtected(req, reshttp) {
+	const user_id = req.query.user_id;
+	const workspace_id = req.query.workspace_id;
+	pool.getConnection((err, connection) => {
+		if (err) throw err;
+		isUserInWorkspace(user_id, workspace_id, connection, (res) => {
+			if (res) {
+				connection.query(
+					`select protect from workspaces where id = ${workspace_id}`,
+					(err, res) => {
+						if (err) throw err;
+						connection.release();
+						reshttp.end(
+							JSON.stringify({
+								message: "protected workspace?",
+								protected: res[0].protect,
+								variant: "success",
+							})
+						);
+						return;
+					}
+				);
+			} else {
+				connection.release();
+				reshttp.end(
+					JSON.stringify({
+						message: "workspace created, and user inserted",
+						id: res[0],
+						variant: "success",
+					})
+				);
+				return;
+			}
+		});
+	});
+}
 
 function addWorkspace(req, reshttp) {
 	// if (
@@ -81,48 +119,56 @@ function updateWorkspace(req, reshttp) {
 		if (err) throw err;
 		isUserInWorkspace(user_id, workspace_id, connection, (res) => {
 			if (res) {
-				connection.query(`select secret, edit_key from workspaces where id = ${workspace_id}`, (err, res) => {
-					if (err) throw err;
-					if (
-						res[0].edit_key === edit_key &&
-						res[0].secret === secret
-					) {
-						connection.query(
-							`update workspaces set name = '${name}' where id = ${workspace_id}`,
-							(err) => {
-								if (err) throw err;
-								connection.release();
-								reshttp.setHeader(
-									"Content-Type",
-									"application/json"
-								);
-								reshttp.end(
-									JSON.stringify({
-										message: "workspace name updated",
-										variant: "success",
-									})
-								);
-								return;
-							}
-						);
-					} else {
-						connection.release();
-						reshttp.setHeader("Content-Type", "application/json");
-						reshttp.end(
-							JSON.stringify({
-								message: "secret key or edit key is incorrect",
-								variant: "error",
-							})
-						);
-						return;
+				connection.query(
+					`select secret, edit_key from workspaces where id = ${workspace_id}`,
+					(err, res) => {
+						if (err) throw err;
+						if (
+							res[0].edit_key === edit_key &&
+							res[0].secret === secret
+						) {
+							connection.query(
+								`update workspaces set name = '${name}' where id = ${workspace_id}`,
+								(err) => {
+									if (err) throw err;
+									connection.release();
+									reshttp.setHeader(
+										"Content-Type",
+										"application/json"
+									);
+									reshttp.end(
+										JSON.stringify({
+											message: "workspace name updated",
+											variant: "success",
+										})
+									);
+									return;
+								}
+							);
+						} else {
+							connection.release();
+							reshttp.setHeader(
+								"Content-Type",
+								"application/json"
+							);
+							reshttp.end(
+								JSON.stringify({
+									message:
+										"secret key or edit key is incorrect",
+									variant: "error",
+								})
+							);
+							return;
+						}
 					}
-				})
+				);
 			} else {
 				connection.release();
 				reshttp.setHeader("Content-Type", "application/json");
 				reshttp.end(
 					JSON.stringify({
-						message: "user id isn't in this workspace, or workspace doesn't exist",
+						message:
+							"user id isn't in this workspace, or workspace doesn't exist",
 						variant: "error",
 					})
 				);
