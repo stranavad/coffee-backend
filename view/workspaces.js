@@ -179,15 +179,18 @@ function addWorkspace(req, reshttp) {
 				);
 				return;
 			}
-		})
+		});
 	});
 }
 
 function userExists(userId, connection, callback) {
-	connection.query(`select id from users where id = ${userId}`, (err, res) => {
-		if (err) throw err;
-		callback(res.length > 0 ? true : false);
-	})
+	connection.query(
+		`select id from users where id = ${userId}`,
+		(err, res) => {
+			if (err) throw err;
+			callback(res.length > 0 ? true : false);
+		}
+	);
 }
 
 // function updateWorkspace(req, reshttp) {
@@ -286,11 +289,51 @@ function editWorkspace(req, reshttp) {
 		if (err) throw err;
 		isUserInWorkspace(userId, workspaceId, connection, (res) => {
 			if (res) {
-				connection.query(`select creator, editKey from workspaces where id = ${workspaceId}`, (err, res) => {
-					if (err) throw err;
-					console.log(res);
-				})
-				
+				connection.query(
+					`select creator, edit_key from workspaces where id = ${workspaceId}`,
+					(err, res) => {
+						if (err) throw err;
+						console.log(res);
+						const workspace = res[0];
+						if (
+							userId === workspace.creator ||
+							editKey === workspace.edit_key
+						) {
+							connection.query(
+								`update workspaces set name = ${workspaceName} where workspaceId = ${workspaceId}`,
+								(err) => {
+									if (err) throw err;
+									connection.release();
+									reshttp.setHeader(
+										"Content-Type",
+										"application/json"
+									);
+									reshttp.end(
+										JSON.stringify({
+											message: " workspace named changed",
+											variant: "success",
+										})
+									);
+									return;
+								}
+							);
+						} else {
+							connection.release();
+							reshttp.setHeader(
+								"Content-Type",
+								"application/json"
+							);
+							reshttp.end(
+								JSON.stringify({
+									message:
+										"user doesnt have enough permission",
+									variant: "error",
+								})
+							);
+							return;
+						}
+					}
+				);
 			} else {
 				connection.release();
 				reshttp.setHeader("Content-Type", "application/json");
@@ -302,9 +345,10 @@ function editWorkspace(req, reshttp) {
 				);
 				return;
 			}
-		})
-	})
+		});
+	});
 }
+
 
 // function deleteWorkspace(req, reshttp) {
 
