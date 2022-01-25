@@ -349,6 +349,67 @@ function editWorkspace(req, reshttp) {
 	});
 }
 
+function editWorkspaceSecret(req, reshttp) {
+	const userId = req.body.userId;
+	const workspaceId = req.body.workspaceId;
+	const workspaceOldSecret = req.body.workspaceOldSecret;
+	const workspaceNewSecret = req.body.workspaceNewSecret;
+	pool.getConnection((err, connection) => {
+		if (err) throw err;
+		isUserCreator(userId, workspaceId, connection, (res) => {
+			if (res) {
+				connection.query(`select secret from workspaces where id = ${workspaceId}`, (err, res) => {
+					if (err) throw err;
+					if (res[0].secret === workspaceOldSecret) {
+						connection.query(`update workspaces set secret = ${workspaceNewSecret} where id = ${workspaceId}`, (err) => {
+							if (err) throw err;
+							connection.release();
+							reshttp.setHeader(
+								"Content-Type",
+								"application/json"
+							);
+							reshttp.end(
+								JSON.stringify({
+									message:
+										"secret successfully changed",
+									variant: "error",
+								})
+							);
+							return;
+						})
+					} else {
+						connection.release();
+						reshttp.setHeader("Content-Type", "application/json");
+						reshttp.end(
+							JSON.stringify({
+								message: "old password is incorrect",
+								variant: "warning",
+							})
+						);
+						return;
+					}
+				})
+			} else {
+				connection.release();
+				reshttp.setHeader("Content-Type", "application/json");
+				reshttp.end(
+					JSON.stringify({
+						message: "user doesnt have enough permission",
+						variant: "error",
+					})
+				);
+				return;
+			}
+		})
+	});
+}
+
+function isUserCreator(userId, workspaceId, connection, callback) {
+	connection.query(`select creator from workspaces where id = ${workspaceId}`, (err, res) => {
+		if (err) throw err;
+		callback(res[0].creator === userId ? true : false);
+	})
+}
 
 // function deleteWorkspace(req, reshttp) {
 
