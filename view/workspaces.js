@@ -134,40 +134,60 @@ function addWorkspace(req, reshttp) {
 
 	pool.getConnection((err, connection) => {
 		if (err) throw err;
-		connection.query(
-			`insert into workspaces (name, secret, protect, edit_key) values ('${name}', '${secret}', ${protect}, '${editKey}')`,
-			(err, res) => {
-				if (err) throw err;
+		userExists(userId, connection, (res) => {
+			if (res) {
 				connection.query(
-					`select max(id) from workspaces where name = '${name}' and secret = '${secret}'`,
+					`insert into workspaces (name, secret, protect, edit_key, creator) values ('${name}', '${secret}', ${protect}, '${editKey}', ${userId})`,
 					(err, res) => {
 						if (err) throw err;
-						const workspaceId = res[0]["max(id)"];
 						connection.query(
-							`insert into users_workspaces (user_id, workspace_id) values (${userId}, '${workspaceId}')`,
+							`select max(id) from workspaces where name = '${name}' and secret = '${secret}'`,
 							(err, res) => {
 								if (err) throw err;
-								connection.release();
-								reshttp.setHeader(
-									"Content-Type",
-									"application/json"
+								const workspaceId = res[0]["max(id)"];
+								connection.query(
+									`insert into users_workspaces (user_id, workspace_id) values (${userId}, '${workspaceId}')`,
+									(err, res) => {
+										if (err) throw err;
+										connection.release();
+										reshttp.setHeader(
+											"Content-Type",
+											"application/json"
+										);
+										reshttp.end(
+											JSON.stringify({
+												message: "created",
+												id: workspaceId,
+												variant: "success",
+											})
+										);
+										return;
+									}
 								);
-								reshttp.end(
-									JSON.stringify({
-										message:
-											"created",
-										id: workspaceId,
-										variant: "success",
-									})
-								);
-								return;
 							}
 						);
 					}
 				);
+			} else {
+				connection.release();
+				reshttp.setHeader("Content-Type", "application/json");
+				reshttp.end(
+					JSON.stringify({
+						message: "user is not registered",
+						variant: "error",
+					})
+				);
+				return;
 			}
-		);
+		})
 	});
+}
+
+function userExists(userId, connection, callback) {
+	connection.query(`select id from users where id = ${userId}`, (err, res) => {
+		if (err) throw err;
+		callback(res.length > 0 ? true : false);
+	})
 }
 
 // function updateWorkspace(req, reshttp) {
@@ -255,6 +275,36 @@ const isUserInWorkspace = (user_id, workspace_id, connection, callback) => {
 		}
 	);
 };
+
+function editWorkspace(req, reshttp) {
+	const userId = parseInt(req.body.userId, 10);
+	const workspaceId = parseInt(req.body.workspaceId, 10);
+	const workspaceName = req.body.workspaceName;
+	const editKey = req.body.editKey;
+
+	pool.getConnection((err, connection) => {
+		if (err) throw err;
+		isUserInWorkspace(userId, workspaceId, connection, (res) => {
+			if (res) {
+				connection.query(`select creator, editKey from workspaces where id = ${workspaceId}`, (err, res) => {
+					if (err) throw err;
+					console.log(res);
+				})
+				
+			} else {
+				connection.release();
+				reshttp.setHeader("Content-Type", "application/json");
+				reshttp.end(
+					JSON.stringify({
+						message: "user is not in this workspace",
+						variant: "warning",
+					})
+				);
+				return;
+			}
+		})
+	})
+}
 
 // function deleteWorkspace(req, reshttp) {
 
