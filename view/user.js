@@ -12,8 +12,45 @@ router.get("/", jsonParser, isUserInWorkspaceReq);
 // workspaces
 router.get("/workspace", jsonParser, getUserWorkspace);
 router.post("/workspace", jsonParser, addUserWorkspace);
+router.delete("/workspace", jsonParser, leaveWorkspace);
 
 module.exports = router;
+
+function leaveWorkspace(req, reshttp) {
+	const userId = req.query.userId;
+	const workspaceId = req.query.workspaceId;
+
+	pool.getConnection((err, connection) => {
+		if (err) throw err;
+		isUserInWorkspace(userId, workspaceId, connection, (res) => {
+			if (res) {
+				connection.query(
+					`delete from users_workspaces where workspace_id = ${workspaceId} and user_id = ${userId}`,
+					(err, res) => {
+						if (err) throw err;
+						reshttp.setHeader("Content-Type", "application/json");
+						reshttp.end(
+							JSON.stringify({
+								message: "removed",
+								variant: "success",
+							})
+						);
+						return;
+					}
+				);
+			} else {
+				reshttp.setHeader("Content-Type", "application/json");
+				reshttp.end(
+					JSON.stringify({
+						message: "this user is not in this workspace",
+						variant: "warning",
+					})
+				);
+				return;
+			}
+		});
+	});
+}
 
 function isUserInWorkspaceReq(req, reshttp) {
 	const user_id = parseInt(req.query.user_id);
@@ -238,7 +275,6 @@ function addUserWorkspace(req, reshttp) {
 						} else {
 							connection.release();
 							return;
-
 						}
 					}
 				);

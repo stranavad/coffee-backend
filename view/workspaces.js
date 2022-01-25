@@ -126,11 +126,11 @@ function getWorkspaceProtected(req, reshttp) {
 }
 
 function addWorkspace(req, reshttp) {
-	const userId = userId;
-	const name = req.query.name;
-	const secret = req.query.secret;
-	const protect = req.query.protect;
-	const editKey = req.query.editKey;
+	const userId = req.body.userId;
+	const name = req.body.name;
+	const secret = req.body.secret;
+	const protect = req.body.protect;
+	const editKey = protect ? req.body.editKey : "";
 
 	pool.getConnection((err, connection) => {
 		if (err) throw err;
@@ -142,9 +142,9 @@ function addWorkspace(req, reshttp) {
 					`select max(id) from workspaces where name = '${name}' and secret = '${secret}'`,
 					(err, res) => {
 						if (err) throw err;
-						const workspace_id = res[0]["max(id)"];
+						const workspaceId = res[0]["max(id)"];
 						connection.query(
-							`insert into users_workspaces (user_id, workspace_id) values (${userId}, '${workspaceid}')`,
+							`insert into users_workspaces (user_id, workspace_id) values (${userId}, '${workspaceId}')`,
 							(err, res) => {
 								if (err) throw err;
 								connection.release();
@@ -155,8 +155,8 @@ function addWorkspace(req, reshttp) {
 								reshttp.end(
 									JSON.stringify({
 										message:
-											"workspace created, and user inserted",
-										id: res[0],
+											"created",
+										id: workspaceId,
 										variant: "success",
 									})
 								);
